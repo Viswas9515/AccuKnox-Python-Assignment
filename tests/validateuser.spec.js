@@ -4,33 +4,24 @@ const DashboardPage = require('../pages/DashboardPage');
 const AdminPage = require('../pages/AdminPage');
 
 test('Validate Updated User', async ({ page }) => {
-
     const loginPage = new LoginPage(page);
     const dashboardPage = new DashboardPage(page);
     const adminPage = new AdminPage(page);
 
-    // Login
     await loginPage.goto();
     await loginPage.login('Admin', 'admin123');
-
-    // Open Admin
     await dashboardPage.clickAdmin();
 
-    // Add User
+    // 1. Create unique user
     await adminPage.clickAdd();
-    const username = await adminPage.fillUserDetails();
+    const createdUser = await adminPage.fillUserDetails();
 
-    // Go back to Admin page
-    await dashboardPage.clickAdmin();
-
-    // Search User
-    await adminPage.searchUser(username);
-
-    // Edit User
+    // 2. Search and update user status to Disabled
+    await adminPage.searchUser(createdUser);
     await adminPage.clickEdit();
     await adminPage.updateUserStatus();
 
-    // Verify success message
-    await expect(page.locator('.oxd-toast'))
-        .toContainText('Successfully Updated');
+    // 3. Search updated user and confirm Disabled status in results table
+    await adminPage.searchUser(createdUser);
+    await expect(adminPage.tableBody).toContainText('Disabled');
 });

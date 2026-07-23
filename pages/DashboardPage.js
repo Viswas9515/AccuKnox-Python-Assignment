@@ -1,4 +1,9 @@
+const { expect } = require('@playwright/test');
+
 class DashboardPage {
+    /**
+     * @param {import('@playwright/test').Page} page
+     */
     constructor(page) {
         this.page = page;
         this.adminMenu = page.getByRole('link', { name: 'Admin' });
@@ -6,9 +11,7 @@ class DashboardPage {
 
     async clickAdmin() {
         await this.adminMenu.click();
-
-        // Wait until the Admin page has loaded
-        await this.page.waitForURL(/admin/);
+        await expect(this.page).toHaveURL(/.*admin\/viewSystemUsers/);
     }
 }
 

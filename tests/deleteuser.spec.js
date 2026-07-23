@@ -4,30 +4,24 @@ const DashboardPage = require('../pages/DashboardPage');
 const AdminPage = require('../pages/AdminPage');
 
 test('Delete User', async ({ page }) => {
-
     const loginPage = new LoginPage(page);
     const dashboardPage = new DashboardPage(page);
     const adminPage = new AdminPage(page);
 
     await loginPage.goto();
     await loginPage.login('Admin', 'admin123');
-
     await dashboardPage.clickAdmin();
 
-    // Create a new user
+    // 1. Create temporary user
     await adminPage.clickAdd();
-    const username = await adminPage.fillUserDetails();
+    const createdUser = await adminPage.fillUserDetails();
 
-    // Go back to Admin page
-    await dashboardPage.clickAdmin();
-
-    // Search for the newly created user
-    await adminPage.searchUser(username);
-
-    // Delete the user
+    // 2. Search and delete created user
+    await adminPage.searchUser(createdUser);
     await adminPage.clickDelete();
     await adminPage.confirmDelete();
 
-    // Verify deletion
-    await expect(page.locator('.oxd-toast')).toContainText('Successfully Deleted');
+    // 3. Search user again to confirm deletion
+    await adminPage.searchUser(createdUser);
+    await expect(page.locator('.orangehrm-paper-container')).toContainText('No Records Found');
 });

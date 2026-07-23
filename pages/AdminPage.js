@@ -1,86 +1,131 @@
+const { expect } = require('@playwright/test');
+
 class AdminPage {
+    /**
+     * @param {import('@playwright/test').Page} page
+     */
     constructor(page) {
         this.page = page;
 
-        // Add User
+        // Buttons
         this.addButton = page.getByRole('button', { name: 'Add' });
-        this.userRole = page.locator('.oxd-select-text').first();
-        this.employeeName = page.getByRole('textbox', { name: 'Type for hints...' });
-        this.status = page.locator('.oxd-select-text').nth(1);
-        this.username = page.locator('input').nth(2);
-        this.password = page.locator('input[type="password"]').first();
-        this.confirmPassword = page.locator('input[type="password"]').nth(1);
         this.saveButton = page.getByRole('button', { name: 'Save' });
-
-        // Search User
-        this.searchUsername = page.locator('.oxd-input').nth(1);
         this.searchButton = page.getByRole('button', { name: 'Search' });
+        this.resetButton = page.getByRole('button', { name: 'Reset' });
+
+        // Add/Edit Form Inputs
+        this.userRoleDropdown = page.locator('.oxd-select-text').first();
+        this.statusDropdown = page.locator('.oxd-select-text').nth(1);
+        this.employeeNameInput = page.getByPlaceholder('Type for hints...');
+
+        this.usernameInput = page.locator(
+            '//label[text()="Username"]/ancestor::div[contains(@class,"oxd-input-group")]//input'
+        );
+        this.passwordInput = page.locator('input[type="password"]').first();
+        this.confirmPasswordInput = page.locator('input[type="password"]').nth(1);
+
+        // Search Input
+        this.searchUsernameInput = page.locator(
+            '//label[text()="Username"]/ancestor::div[contains(@class,"oxd-input-group")]//input'
+        );
+
+        // Table & Confirmation Locators
+        this.editButton = page.locator('button i.bi-pencil-fill').first();
+        this.deleteButton = page.locator('button i.bi-trash').first();
+        this.confirmDeleteButton = page.locator('.oxd-sheet button.oxd-button--label-danger');
+        
+        // Table Body & Toast Locators
+        this.tableBody = page.locator('.oxd-table-body');
+        this.toastMessage = page.locator('.oxd-toast');
     }
 
-    // Click Add Button
     async clickAdd() {
         await this.addButton.click();
+        await expect(this.page).toHaveURL(/.*admin\/saveSystemUser/);
     }
 
-    // Fill User Details
     async fillUserDetails() {
-
-        await this.userRole.click();
+        // 1. Role
+        await this.userRoleDropdown.click();
         await this.page.getByRole('option', { name: 'Admin' }).click();
 
-        await this.employeeName.fill('a');
-        await this.page.waitForTimeout(3000);
-        await this.page.keyboard.press('ArrowDown');
-        await this.page.keyboard.press('Enter');
+        // 2. Employee Name
+        await this.employeeNameInput.fill('a');
+        const optionItem = this.page.locator('.oxd-autocomplete-option span').first();
+        await optionItem.waitFor({ state: 'visible', timeout: 10000 });
+        await optionItem.click();
 
-        await this.status.click();
+        // 3. Status
+        await this.statusDropdown.click();
         await this.page.getByRole('option', { name: 'Enabled' }).click();
 
-        const username = 'fabian' + Date.now();
+        // 4. Credentials
+        const newUsername = 'user' + Date.now();
+        await this.usernameInput.fill(newUsername);
+        await this.passwordInput.fill('Admin@123');
+        await this.confirmPasswordInput.fill('Admin@123');
 
-        await this.username.fill(username);
-        await this.password.fill('Admin@123');
-        await this.confirmPassword.fill('Admin@123');
+        // 5. Save & wait for API
+        await Promise.all([
+            this.page.waitForResponse(
+                (response) =>
+                    response.url().includes('/api/v2/admin/users') &&
+                    (response.status() === 200 || response.status() === 201)
+            ),
+            this.saveButton.click()
+        ]);
 
-        await this.saveButton.click();
-
-        // Wait for success message
-        await this.page.waitForSelector('.oxd-toast', { timeout: 10000 });
-
-        return username;
+        await expect(this.page).toHaveURL(/.*admin\/viewSystemUsers/, { timeout: 15000 });
+        return newUsername;
     }
 
-    // Search User
     async searchUser(username) {
-        await this.searchUsername.fill(username);
-        await this.searchButton.click();
-        await this.page.waitForTimeout(2000);
+        await this.searchUsernameInput.waitFor({ state: 'visible', timeout: 10000 });
+        await this.searchUsernameInput.fill('');
+        await this.searchUsernameInput.fill(username);
+
+        await Promise.all([
+            this.page.waitForResponse((response) =>
+                response.url().includes('/api/v2/admin/users')
+            ),
+            this.searchButton.click()
+        ]);
     }
 
-    // Click Edit
     async clickEdit() {
-        await this.page.locator('button.oxd-icon-button:has(i.bi-pencil-fill)').first().click();
+        await this.editButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.editButton.click();
     }
 
-    // Update User Status to Disabled
     async updateUserStatus() {
-
-        await this.status.click();
+        await this.statusDropdown.click();
         await this.page.getByRole('option', { name: 'Disabled' }).click();
 
-        await this.saveButton.click();
+        await Promise.all([
+            this.page.waitForResponse(
+                (response) =>
+                    response.url().includes('/api/v2/admin/users') &&
+                    response.status() === 200
+            ),
+            this.saveButton.click()
+        ]);
 
-        await this.page.waitForSelector('.oxd-toast', { timeout: 10000 });
+        await expect(this.page).toHaveURL(/.*admin\/viewSystemUsers/, { timeout: 15000 });
     }
 
-    // Click Delete
     async clickDelete() {
-        await this.page.locator('button.oxd-icon-button:has(i.bi-trash)').first().click();
+        await this.deleteButton.waitFor({ state: 'visible', timeout: 10000 });
+        await this.deleteButton.click();
     }
 
-    // Confirm Delete
     async confirmDelete() {
-        await this.page.getByRole('button', { name: /Yes, Delete/i }).click();
+        await this.confirmDeleteButton.waitFor({ state: 'visible', timeout: 10000 });
+        await Promise.all([
+            this.page.waitForResponse((response) =>
+                response.url().includes('/api/v2/admin/users')
+            ),
+            this.confirmDeleteButton.click()
+        ]);
     }
 }
 
